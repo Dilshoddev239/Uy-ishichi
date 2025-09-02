@@ -11,6 +11,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from PIL import Image
 import requests
 import pytz
+from telegram.ext import JobQueue
 
 # Logging sozlamalari
 logging.basicConfig(
@@ -27,7 +28,7 @@ API_KEYS = [
     "AIzaSyDQPaUa-wIX4xpoiXwfHD2P1h5CTt6c4qA",
     "AIzaSyBa2SKZ9e7BPCImOgDfHvsVRb4J6hqLRGM"
 ]
-TELEGRAM_TOKEN = "8386018951:AAFxK6zUhZjNvlnMSJICk81WRVi2FmIX1vU"
+TELEGRAM_TOKEN = "7994836821:AAFEoMd6JBHqb6I4x6M3U0pDTww68EOnxnA"
 ADMIN_ID = 7445142075
 
 # Majburiy kanal
@@ -302,6 +303,99 @@ def remove_pro_access(user_id):
     conn.commit()
     conn.close()
 
+async def check_and_notify_expiries(context: ContextTypes.DEFAULT_TYPE):
+    """Pro obuna va blok muddatlarini tekshirish va xabar berish"""
+    try:
+        current_date = datetime.now().date()
+        current_time, _ = get_current_time()
+        
+        # Pro obuna muddatlarini tekshirish
+        conn = sqlite3.connect('dilshod_ai.db')
+        cursor = conn.cursor()
+        
+        # Muddati tugagan pro foydalanuvchilarni topish
+        cursor.execute('''
+            SELECT user_id, first_name, pro_expiry 
+            FROM users 
+            WHERE is_pro = 1 AND pro_expiry IS NOT NULL AND pro_expiry <= ?
+        ''', (current_date,))
+        
+        expired_pro_users = cursor.fetchall()
+        
+        for user_id, first_name, pro_expiry in expired_pro_users:
+            # Pro obunani o'chirish
+            cursor.execute('UPDATE users SET is_pro = 0, pro_expiry = NULL WHERE user_id = ?', (user_id,))
+            
+            # Foydalanuvchiga xabar yuborish
+            try:
+                pro_tugadi_xabari = f"""⏰ Pro obuna muddati tugadi!
+
+Hurmatli {first_name or 'foydalanuvchi'}, sizning Pro obunangiz muddati tugadi.
+
+Endi siz:
+❌ Kuniga faqat 1 ta savol bera olasiz
+❌ Rasmlarni yuklay olmaysiz
+
+🔄 Qayta Pro obuna olish uchun admin bilan bog'laning:
+👨‍💻 @dilshod_sayfiddinov
+
+🕐 Tugagan vaqt: {current_time}"""
+                
+                await context.bot.send_message(user_id, pro_tugadi_xabari)
+                logger.info(f"Pro muddati tugagan foydalanuvchiga xabar yuborildi: {user_id}")
+            except Exception as e:
+                logger.error(f"Pro tugash xabarini yuborishda xato {user_id}: {e}")
+        
+        conn.commit()
+        conn.close()
+        
+        # Blok muddatlarini tekshirish
+        expired_blocks = []
+        for user_id_str, block_info in list(blocked_users.items()):
+            if not block_info.get('permanent', False):
+                expiry_date = datetime.strptime(block_info['expiry'], '%Y-%m-%d').date()
+                if expiry_date <= current_date:
+                    expired_blocks.append(user_id_str)
+        
+        # Muddati tugagan bloklarni o'chirish va xabar yuborish
+        for user_id_str in expired_blocks:
+            user_id = int(user_id_str)
+            del blocked_users[user_id_str]
+            
+            # Foydalanuvchiga xabar yuborish
+            try:
+                # Foydalanuvchi ismini olish
+                conn = sqlite3.connect('dilshod_ai.db')
+                cursor = conn.cursor()
+                cursor.execute('SELECT first_name FROM users WHERE user_id = ?', (user_id,))
+                result = cursor.fetchone()
+                first_name = result[0] if result else 'foydalanuvchi'
+                conn.close()
+                
+                blok_tugadi_xabari = f"""✅ Blok muddati tugadi!
+
+Hurmatli {first_name}, sizning blok muddatingiz tugadi.
+
+Endi botdan erkin foydalanishingiz mumkin! 🎉
+
+🕐 Tugagan vaqt: {current_time}
+👨‍💻 Admin: Dilshod Sayfiddinov"""
+                
+                await context.bot.send_message(user_id, blok_tugadi_xabari)
+                logger.info(f"Blok muddati tugagan foydalanuvchiga xabar yuborildi: {user_id}")
+            except Exception as e:
+                logger.error(f"Blok tugash xabarini yuborishda xato {user_id}: {e}")
+        
+        # Yangilangan blok ma'lumotlarini saqlash
+        if expired_blocks:
+            save_json_file(BLOCKS_FILE, blocked_users)
+            logger.info(f"{len(expired_blocks)} ta blok muddati tugadi va o'chirildi")
+        
+        if expired_pro_users:
+            logger.info(f"{len(expired_pro_users)} ta pro obuna muddati tugadi")
+            
+    except Exception as e:
+        logger.error(f"Muddatlarni tekshirishda xato: {e}")
 def save_question(user_id, question, answer, has_image=False):
     """Savolni ma'lumotlar bazasi va JSON faylga saqlash"""
     conn = sqlite3.connect('dilshod_ai.db')
@@ -1228,6 +1322,12 @@ def main():
     
     # Bot ilovasi
     application = Application.builder().token(TELEGRAM_TOKEN).build()
+    
+    # Muddatlarni tekshirish uchun job queue
+    job_queue = application.job_queue
+    
+    # Har daqiqada muddatlarni tekshirish
+    job_queue.run_repeating(check_and_notify_expiries, interval=60, first=10)
     
     # Handlerlar
     application.add_handler(CommandHandler("start", start))
