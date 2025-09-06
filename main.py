@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 
 # Konfiguratsiya
 API_KEYS = [
-    "null",
-    "null",
-    "null", 
-    "null",
-    "null"
+    "AIzaSyAMkhZR1foHJk_y2wVg2F5wrOEjj590BJc",
+    "AIzaSyD23AJ0fZiN6ELHKHJTUbiL8EqLswzPWmA",
+    "AIzaSyB8QL_c9GzAXRRL4ZS_BafuW74mjceBzUg", 
+    "AIzaSyDQPaUa-wIX4xpoiXwfHD2P1h5CTt6c4qA",
+    "AIzaSyBa2SKZ9e7BPCImOgDfHvsVRb4J6hqLRGM"
 ]
-TELEGRAM_TOKEN = "null"
+TELEGRAM_TOKEN = "8386018951:AAFxK6zUhZjNvlnMSJICk81WRVi2FmIX1vU"
 ADMIN_ID = 7445142075
 
 # Majburiy kanal
@@ -79,6 +79,7 @@ def init_database():
             is_pro BOOLEAN DEFAULT 0,
             pro_expiry DATE,
             daily_questions INTEGER DEFAULT 0,
+            daily_images INTEGER DEFAULT 0,
             last_reset DATE,
             is_blocked BOOLEAN DEFAULT 0,
             block_expiry DATE,
@@ -136,9 +137,9 @@ def add_user(user_id, username, first_name, last_name):
     else:
         # Yangi foydalanuvchi qo'shish
         cursor.execute('''
-            INSERT INTO users (user_id, username, first_name, last_name, last_reset, daily_questions)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (user_id, username, first_name, last_name, datetime.now().date(), 0))
+            INSERT INTO users (user_id, username, first_name, last_name, last_reset, daily_questions, daily_images)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, username, first_name, last_name, datetime.now().date(), 0, 0))
     
     conn.commit()
     conn.close()
@@ -222,9 +223,46 @@ def update_daily_questions(user_id):
     else:
         # Foydalanuvchi topilmasa, uni qo'shish
         cursor.execute('''
-            INSERT INTO users (user_id, daily_questions, last_reset)
-            VALUES (?, ?, ?)
-        ''', (user_id, 1, today))
+            INSERT INTO users (user_id, daily_questions, daily_images, last_reset)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, 1, 0, today))
+    
+    conn.commit()
+    conn.close()
+
+def update_daily_images(user_id):
+    """Kunlik rasm hisoblagichini yangilash"""
+    conn = sqlite3.connect('dilshod_ai.db')
+    cursor = conn.cursor()
+    
+    today = datetime.now().date()
+    cursor.execute('SELECT daily_images, last_reset FROM users WHERE user_id = ?', (user_id,))
+    result = cursor.fetchone()
+    
+    if result:
+        daily_images, last_reset = result
+        if last_reset:
+            if isinstance(last_reset, str):
+                last_reset_date = datetime.strptime(last_reset, '%Y-%m-%d').date()
+            else:
+                last_reset_date = last_reset
+        else:
+            last_reset_date = today
+        
+        if last_reset_date < today:
+            # Yangi kun - hisoblagichni 1 ga o'rnatish
+            cursor.execute('UPDATE users SET daily_images = 1, last_reset = ? WHERE user_id = ?', 
+                         (today, user_id))
+        else:
+            # Bir xil kun - hisoblagichni oshirish
+            cursor.execute('UPDATE users SET daily_images = daily_images + 1 WHERE user_id = ?', 
+                         (user_id,))
+    else:
+        # Foydalanuvchi topilmasa, uni qo'shish
+        cursor.execute('''
+            INSERT INTO users (user_id, daily_questions, daily_images, last_reset)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, 0, 1, today))
     
     conn.commit()
     conn.close()
@@ -257,6 +295,39 @@ def get_daily_questions_count(user_id):
         
         conn.close()
         return daily_questions if daily_questions else 0
+    
+    conn.close()
+    return 0
+
+def get_daily_images_count(user_id):
+    """Kunlik rasm sonini olish"""
+    conn = sqlite3.connect('dilshod_ai.db')
+    cursor = conn.cursor()
+    
+    today = datetime.now().date()
+    cursor.execute('SELECT daily_images, last_reset FROM users WHERE user_id = ?', (user_id,))
+    result = cursor.fetchone()
+    
+    if result:
+        daily_images, last_reset = result
+        if last_reset:
+            if isinstance(last_reset, str):
+                last_reset_date = datetime.strptime(last_reset, '%Y-%m-%d').date()
+            else:
+                last_reset_date = last_reset
+        else:
+            last_reset_date = today
+        
+        if last_reset_date < today:
+            # Yangi kun boshlanganda hisoblagichni 0 ga qaytarish
+            cursor.execute('UPDATE users SET daily_images = 0, last_reset = ? WHERE user_id = ?', 
+                         (today, user_id))
+            conn.commit()
+            conn.close()
+            return 0
+        
+        conn.close()
+        return daily_images if daily_images else 0
     
     conn.close()
     return 0
@@ -333,8 +404,8 @@ async def check_and_notify_expiries(context: ContextTypes.DEFAULT_TYPE):
 Hurmatli {first_name or 'foydalanuvchi'}, sizning Pro obunangiz muddati tugadi.
 
 Endi siz:
-❌ Kuniga faqat 1 ta savol bera olasiz
-❌ Rasmlarni yuklay olmaysiz
+❌ Kuniga faqat 3 ta savol bera olasiz
+❌ Kuniga faqat 1 ta rasm yuklay olasiz
 
 🔄 Qayta Pro obuna olish uchun admin bilan bog'laning:
 👨‍💻 @dilshod_sayfiddinov
@@ -396,6 +467,7 @@ Endi botdan erkin foydalanishingiz mumkin! 🎉
             
     except Exception as e:
         logger.error(f"Muddatlarni tekshirishda xato: {e}")
+
 def save_question(user_id, question, answer, has_image=False):
     """Savolni ma'lumotlar bazasi va JSON faylga saqlash"""
     conn = sqlite3.connect('dilshod_ai.db')
@@ -598,7 +670,7 @@ Men sizga har qanday savollaringizga javob berishga tayyorman. Rasmlarni ham tah
 🧠 **Muhim:** Men sizning barcha suhbatlaringizni eslab qolaman!
 
 📊 Sizning holatingiz:
-{'🌟 Pro foydalanuvchi' if is_pro_user(user.id) else '👤 Oddiy foydalanuvchi (kuniga 1 ta savol)'}
+{'🌟 Pro foydalanuvchi (cheksiz)' if is_pro_user(user.id) else '👤 Oddiy foydalanuvchi (kuniga 3 ta savol, 1 ta rasm)'}
 
 🕐 Hozirgi vaqt: {current_time}
 👨‍💻 Yaratuvchi: Dilshod Sayfiddinov
@@ -703,19 +775,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Pro foydalanuvchi ekanligini tekshirish
         is_pro = is_pro_user(user.id)
         
-        # Matnlarni tayyorlash
-        pro_questions_text = '✅ Cheksiz savollar (Pro)' if is_pro else '❌ Cheksiz savollar (Pro)'
-        pro_images_text = '✅ Rasmlarni tahlil qilish (Pro)' if is_pro else '❌ Rasmlarni tahlil qilish (Pro)'
-        
         if is_pro:
             status_text = '🌟 Pro foydalanuvchi'
+            questions_text = '✅ Cheksiz savollar (Pro)'
+            images_text = '✅ Cheksiz rasmlar (Pro)'
         else:
-            daily_count = get_daily_questions_count(user.id)
-            status_text = f'👤 Oddiy foydalanuvchi\n📝 Bugungi savollar: {daily_count}/1'
+            daily_questions = get_daily_questions_count(user.id)
+            daily_images = get_daily_images_count(user.id)
+            status_text = f'👤 Oddiy foydalanuvchi\n📝 Bugungi savollar: {daily_questions}/3\n📷 Bugungi rasmlar: {daily_images}/1'
+            questions_text = '✅ Kuniga 3 ta savol'
+            images_text = '✅ Kuniga 1 ta rasm'
         
         info_text = f"""ℹ️ **Bot haqida ma'lumot:**
 
-🤖 **Bot nomi:** Uy ishichi 
+🤖 **Bot nomi:** Dilshod AI
 👨‍💻 **Yaratuvchi:** Dilshod Sayfiddinov
 📅 **Yaratilgan sana:** 2025 yil
 🔄 **Oxirgi yangilanish:** {current_time}
@@ -724,11 +797,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 {status_text}
 
 🎯 **Imkoniyatlar:**
-✅ Savollar va javoblar
+{questions_text}
+{images_text}
 ✅ Uy vazifalari yechimi
-✅ Suhbat tarixini eslab qolish
-{pro_images_text}
-{pro_questions_text}"""
+✅ Suhbat tarixini eslab qolish"""
         
         await update.message.reply_text(info_text)
         return
@@ -737,7 +809,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "⭐ Pro versiya imkoniyatlari:\n\n"
             "✅ Cheksiz savollar\n"
-            "✅ Rasmlarni yuklash va tahlil qilish\n"
+            "✅ Cheksiz rasmlarni yuklash va tahlil qilish\n"
             "✅ Tezroq va sifatliroq javoblar\n"
             "✅ Uy vazifalari uchun maxsus yordam\n"
             "✅ Suhbat tarixini to'liq eslab qolish\n\n"
@@ -760,9 +832,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Foydalanuvchi limitini tekshirish
     if not is_pro_user(user.id) and user.id != ADMIN_ID:
         daily_count = get_daily_questions_count(user.id)
-        if daily_count >= 1:
+        if daily_count >= 3:
             await update.message.reply_text(
-                "❌ Siz bugun 1 ta savolni allaqachon so'ragansiz.\n\n"
+                "❌ Siz bugun 3 ta savolni allaqachon so'ragansiz.\n\n"
                 "Pro versiyaga o'tib, cheksiz savol berish imkoniyatiga ega bo'ling!\n\n"
                 "👨‍💻 Aloqa: @dilshod_sayfiddinov"
             )
@@ -813,19 +885,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # Pro emas va admin emas bo'lsa, rasm yuklashga ruxsat bermaslik
+    # Rasm limitini tekshirish (Pro emas va admin emas bo'lsa)
     if not is_pro_user(user.id) and user.id != ADMIN_ID:
-        await update.message.reply_text(
-            "📸 Rasmlarni yuklash faqat Pro foydalanuvchilar uchun mavjud!\n\n"
-            "👨‍💻 Pro bo'lish uchun: @dilshod_sayfiddinov"
-        )
-        return
-    
-    # Limit tekshiruvi
-    if not is_pro_user(user.id) and user.id != ADMIN_ID:
-        daily_count = get_daily_questions_count(user.id)
-        if daily_count >= 1:
-            await update.message.reply_text("❌ Siz bugun 1 ta savolni allaqachon so'ragansiz.")
+        daily_images = get_daily_images_count(user.id)
+        if daily_images >= 1:
+            await update.message.reply_text(
+                "📸 Siz bugun 1 ta rasmni allaqachon yuklabsiz!\n\n"
+                "Pro versiyaga o'tib, cheksiz rasm yuklash imkoniyatiga ega bo'ling!\n\n"
+                "👨‍💻 Pro bo'lish uchun: @dilshod_sayfiddinov"
+            )
             return
     
     await update.message.reply_text("📷 Rasmni tahlil qilayapman...")
@@ -852,9 +920,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Javobni saqlash
         save_question(user.id, f"[RASM] {caption}", response, True)
         
-        # Savol hisoblagichini yangilash
+        # Rasm hisoblagichini yangilash
         if not is_pro and user.id != ADMIN_ID:
-            update_daily_questions(user.id)
+            update_daily_images(user.id)
         
         await update.message.reply_text(response)
         
@@ -941,6 +1009,10 @@ async def show_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📺 Kanal sozlamalari:
 {'✅' if CHANNEL_ENABLED else '❌'} {kanal_holati}
 📢 Kanal: {kanal_nomi}
+
+🎯 Oddiy foydalanuvchi limitlari:
+📝 Kunlik savollar: 3 ta
+📷 Kunlik rasmlar: 1 ta
 
 🕐 Ma'lumot vaqti: {current_time}
 👨‍💻 Yaratuvchi: Dilshod Sayfiddinov"""
@@ -1046,7 +1118,7 @@ async def gift_pro(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Endi siz:
 ✅ Cheksiz savol bera olasiz
-✅ Rasmlarni yuklash va tahlil qila olasiz  
+✅ Cheksiz rasmlarni yuklash va tahlil qila olasiz  
 ✅ Uy vazifalari uchun maxsus yordam olasiz
 
 🕐 Berilgan vaqt: {current_time}
@@ -1064,7 +1136,7 @@ Endi siz:
 
 Endi siz:
 ✅ Cheksiz savol bera olasiz
-✅ Rasmlarni yuklash va tahlil qila olasiz
+✅ Cheksiz rasmlarni yuklash va tahlil qila olasiz
 ✅ Uy vazifalari uchun maxsus yordam olasiz
 
 🕐 Berilgan vaqt: {current_time}
@@ -1091,7 +1163,7 @@ async def remove_pro_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         try:
             pro_ochirildi_xabari = f"""⚠️ Sizning Pro obunangiz bekor qilindi.
 
-Endi siz kuniga 1 ta savol bera olasiz va rasmlarni yuklay olmaysiz.
+Endi siz kuniga 3 ta savol va 1 ta rasm yuklay olasiz.
 
 🕐 O'chirilgan vaqt: {current_time}
 👨‍💻 Admin: Dilshod Sayfiddinov"""
@@ -1352,6 +1424,9 @@ def main():
     print(f"📺 Kanal sozlamalari: {kanal_sozlamasi}")
     kanal_nomi = REQUIRED_CHANNEL if REQUIRED_CHANNEL else "Belgilanmagan"
     print(f"📢 Majburiy kanal: {kanal_nomi}")
+    print("📊 Yangi limitlar:")
+    print("   👤 Oddiy foydalanuvchilar: 3 ta savol, 1 ta rasm")
+    print("   ⭐ Pro foydalanuvchilar: Cheksiz")
     application.run_polling()
 
 if __name__ == '__main__':
