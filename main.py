@@ -22,9 +22,13 @@ logger = logging.getLogger(__name__)
 
 # Konfiguratsiya
 API_KEYS = [
-  "",
+    "AIzaSyAMkhZR1foHJk_y2wVg2F5wrOEjj590BJc",
+    "AIzaSyD23AJ0fZiN6ELHKHJTUbiL8EqLswzPWmA",
+    "AIzaSyB8QL_c9GzAXRRL4ZS_BafuW74mjceBzUg", 
+    "AIzaSyDQPaUa-wIX4xpoiXwfHD2P1h5CTt6c4qA",
+    "AIzaSyBa2SKZ9e7BPCImOgDfHvsVRb4J6hqLRGM"
 ]
-TELEGRAM_TOKEN = ""
+TELEGRAM_TOKEN = "8386018951:AAFxK6zUhZjNvlnMSJICk81WRVi2FmIX1vU"
 ADMIN_ID = 7445142075
 
 # Majburiy kanal
@@ -787,7 +791,7 @@ UY VAZIFASI YORDAMI QOIDALARI:
 3. Formulalar va misollar bering
 4. Tushuntirishni oddiy va tushunarli qiling
 5. Agar kerak bo'lsa qo'shimcha ma'lumot bering
-6. Agar  foydalanuvchi sizga rasm tashlasa va unda matematik masalallar yoki misolar bo'lssa yechib bering yoki shunchaki uy vazifasi bo'lsa ham uni bajaring shunchaki savol bo'lsa javob yozing rasmda
+6. Agar  foydalanuvchi sizga rasm tashlasa va unda matematik masalallar yoki misolar bo'lssa yechib bering yoki shunchaki uy vazifasi bo'lsa ham uni bajaring shunchaki savol bo'lsa javob yozing rasmda savol misol masala bo'lsa birdaniga qilib ber qaysini yechay yo qaysisi deb o'tirma birdaniga yech rasmdagi misolni yoki masalani va senga matn tashlansa va inglizcha bo'lsa yoki ruscha uni tarjima qilish aytilsa o'zbekcha qilib aar unda uy ishi borligini sezsang u ishini misollarni yechib ber foydalanuvchi rasm tashlasa savol berma undagi vazifani qilib ber
 Har doim o'zbek tilida (lotin alifbosida) javob bering. 
 {yaratuvchi_text}
 
@@ -798,7 +802,7 @@ Har doim o'zbek tilida (lotin alifbosida) javob bering.
 Yaratuvchi haqida so'ralsa "Dilshod Sayfiddinov" deb javob bering.
 Agar foydalanuvchi oldingi suhbatlarimizga murojaat qilsa, oxirgi suhbatlarimizdan foydalaning.
 O'zingizni faqat Dilshod AI deb tanishtiring va sizdi Dishod Sayfiddinov yasagan , Gemini yoki Google haqida gapirmang.
- Agar  foydalanuvchi sizga rasm tashlasa va unda matematik masalallar yoki misolar bo'lssa yechib bering yoki shunchaki uy vazifasi bo'lsa ham uni bajaring shunchaki savol bo'lsa javob yozing rasmda
+Agar  foydalanuvchi sizga rasm tashlasa va unda matematik masalallar yoki misolar bo'lssa yechib bering yoki shunchaki uy vazifasi bo'lsa ham uni bajaring shunchaki savol bo'lsa javob yozing rasmda savol misol masala bo'lsa birdaniga qilib ber qaysini yechay yo qaysisi deb o'tirma birdaniga yech rasmdagi misolni yoki masalani va senga matn tashlansa va inglizcha bo'lsa yoki ruscha uni tarjima qilish aytilsa o'zbekcha qilib aar unda uy ishi borligini sezsang u ishini misollarni yechib ber foydalanuvchi rasm tashlasa savol berma undagi vazifani qilib ber
 
 {conversation_context}"""
             else:
