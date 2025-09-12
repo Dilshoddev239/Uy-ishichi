@@ -22,9 +22,13 @@ logger = logging.getLogger(__name__)
 
 # Konfiguratsiya
 API_KEYS = [
- 
+    "AIzaSyAMkhZR1foHJk_y2wVg2F5wrOEjj590BJc",
+    "AIzaSyD23AJ0fZiN6ELHKHJTUbiL8EqLswzPWmA",
+    "AIzaSyB8QL_c9GzAXRRL4ZS_BafuW74mjceBzUg", 
+    "AIzaSyDQPaUa-wIX4xpoiXwfHD2P1h5CTt6c4qA",
+    "AIzaSyBa2SKZ9e7BPCImOgDfHvsVRb4J6hqLRGM"
 ]
-TELEGRAM_TOKEN = ""
+TELEGRAM_TOKEN = "8386018951:AAFxK6zUhZjNvlnMSJICk81WRVi2FmIX1vU"
 ADMIN_ID = 7445142075
 
 # Majburiy kanal
